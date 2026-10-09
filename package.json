@@ -1,0 +1,21 @@
+{
+  "name": "mio-assistant",
+  "version": "1.0.0",
+  "description": "MIO的助理 - 飞书机器人，集成Claude AI功能",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "@anthropic-ai/sdk": "^0.27.0",
+    "body-parser": "^1.20.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
