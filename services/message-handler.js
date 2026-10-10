@@ -6,13 +6,12 @@ class MessageHandler {
   async handleIncomingMessage(messageEvent) {
     try {
       const message = messageEvent.message;
-      const sender = message.sender;
+      const sender = messageEvent.sender;
       const content = message.content;
 
       console.log('收到消息:', {
-        senderId: sender.sender_id.user_id,
+        senderId: sender.sender_id.open_id,
         messageType: message.message_type,
-        content,
       });
 
       // 解析消息内容
@@ -27,12 +26,12 @@ class MessageHandler {
 
       // 使用Claude处理用户消息
       const reply = await claudeService.processMessage(
-        sender.sender_id.user_id,
+        sender.sender_id.open_id,
         userMessage
       );
 
       // 回复消息
-      await feishuService.sendMessage(sender.sender_id.user_id, reply);
+      await feishuService.replyMessage(message.message_id, reply);
 
       console.log('消息已回复');
       return {
@@ -52,13 +51,13 @@ class MessageHandler {
   async handleGroupMessage(messageEvent) {
     try {
       const message = messageEvent.message;
-      const sender = message.sender;
+      const sender = messageEvent.sender;
       const content = message.content;
       const chatId = message.chat_id;
 
       console.log('收到群组消息:', {
         chatId,
-        senderId: sender.sender_id.user_id,
+        senderId: sender.sender_id.open_id,
       });
 
       let userMessage = '';
@@ -74,7 +73,8 @@ class MessageHandler {
       }
 
       // 检查是否@了机器人
-      if (!userMessage.includes('@')) {
+      const botOpenId = message.mentions?.length ? await feishuService.getBotOpenId() : null;
+      if (!botOpenId || !message.mentions?.some(mention => mention.id?.open_id === botOpenId)) {
         return {
           success: true,
           message: '跳过未提及机器人的消息',
@@ -82,7 +82,7 @@ class MessageHandler {
       }
 
       // 清理@符号
-      const cleanMessage = userMessage.replace(/@\S+\s*/g, '').trim();
+      const cleanMessage = (message.mentions || []).reduce((text, mention) => text.split(mention.key).join(''), userMessage).trim();
 
       if (!cleanMessage) {
         return {
@@ -95,7 +95,7 @@ class MessageHandler {
       const reply = await claudeService.analyzeMessage(cleanMessage);
 
       // 回复群组消息
-      await feishuService.sendGroupMessage(chatId, reply);
+      await feishuService.replyMessage(message.message_id, reply);
 
       console.log('群组消息已回复');
       return {

@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+process.env.PORT = '0';
+process.env.CLAUDE_API_KEY = 'test-only';
+process.env.FEISHU_VERIFICATION_TOKEN = 'test-only';
+const {server} = await import('./server.js');
+const {default: handler} = await import('./services/message-handler.js');
+const {default: claude} = await import('./services/claude.js');
+const {default: feishu} = await import('./services/feishu.js');
+await new Promise(resolve => server.listening ? resolve() : server.on('listening', resolve));
+const base = `http://127.0.0.1:${server.address().port}`;
+const post = body => fetch(base+'/webhook/message',{method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify(body)});
+try {
+  let r = await post({type:'url_verification',token:'test-only',challenge:'test-challenge'});
+  assert.equal(r.status,200); assert.deepEqual(await r.json(),{challenge:'test-challenge'});
+  assert.equal((await post({type:'url_verification',token:'bad',challenge:'x'})).status,401);
+  let calls=0; const original=handler.handleIncomingMessage;
+  handler.handleIncomingMessage=async()=>{calls++;return {success:true};};
+  const event={schema:'2.0',header:{token:'test-only',event_type:'im.message.receive_v1',event_id:'test-event'},event:{sender:{sender_type:'user',sender_id:{open_id:'ou_test'}},message:{message_id:'om_test',chat_type:'p2p',message_type:'text',content:'{"text":"hello"}'}}};
+  assert.equal((await post(event)).status,200); await new Promise(resolve=>setImmediate(resolve));
+  await post(event); await new Promise(resolve=>setImmediate(resolve)); assert.equal(calls,1);
+  handler.handleIncomingMessage=original;
+  const replies=[]; claude.processMessage=async(id,text)=>{assert.equal(id,'ou_test');assert.equal(text,'hello');return 'test reply';};
+  claude.analyzeMessage=async(text)=>{assert.equal(text,'hello');return 'group reply';};
+  feishu.replyMessage=async(id,text)=>replies.push({id,text});feishu.getBotOpenId=async()=> 'ou_bot';
+  assert.equal((await handler.handleIncomingMessage(event.event)).success,true);assert.equal(replies[0].id,'om_test');
+  event.event.message.chat_type='group';event.event.message.mentions=[{key:'@_user_1',id:{open_id:'ou_bot'}}];event.event.message.content='{"text":"@_user_1 hello"}';
+  assert.equal((await handler.handleGroupMessage(event.event)).success,true);assert.equal(replies.length,2);
+  event.event.message.mentions=[{key:'@_user_1',id:{open_id:'ou_other'}}];await handler.handleGroupMessage(event.event);assert.equal(replies.length,2);
+  const bad=await fetch(base+'/webhook/message',{method:'POST',headers:{'content-type':'application/json'},body:'{bad'});assert.equal(bad.status,400);
+  const notify=await fetch(base+'/webhook/notify',{method:'POST',headers:{'content-type':'application/json'},body:'{"message":"test"}'});assert.equal(notify.status,401);
+  console.log('PASS: challenge, authentication, v2 dispatch, deduplication, private reply, bot mentions, malformed JSON, notification authentication');
+} finally {server.closeAllConnections();server.close();}

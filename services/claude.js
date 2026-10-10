@@ -5,6 +5,9 @@ class ClaudeService {
   constructor() {
     this.client = new Anthropic({
       apiKey: config.claude.apiKey,
+      baseURL: config.claude.baseURL,
+      timeout: 60000,
+      maxRetries: 1,
     });
     this.conversationHistory = new Map(); // 存储用户的对话历史
   }
@@ -27,7 +30,7 @@ class ClaudeService {
 
       // 调用Claude API
       const response = await this.client.messages.create({
-        model: 'claude-opus-5',
+        model: config.claude.model,
         max_tokens: 1024,
         system: '你是MIO的助理，一个友好、有帮助的AI助手。你可以帮助用户回答问题、提供建议和进行对话。使用简洁、清晰的语言进行回复。',
         messages: history,
@@ -62,7 +65,7 @@ class ClaudeService {
   async analyzeMessage(message) {
     try {
       const response = await this.client.messages.create({
-        model: 'claude-opus-5',
+        model: config.claude.model,
         max_tokens: 256,
         messages: [
           {

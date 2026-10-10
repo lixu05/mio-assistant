@@ -1,35 +1,15 @@
 import crypto from 'crypto';
 import config from '../config.js';
 
-// 飞书请求验证中间件
 export function verifyFeishuRequest(req, res, next) {
-  const timestamp = req.headers['x-feishu-request-timestamp'];
-  const signature = req.headers['x-feishu-request-signature'];
-  const body = req.rawBody || '';
-
-  // 如果没有签名头，直接放行（可能是URL验证请求）
-  if (!timestamp || !signature) {
-    console.warn('缺少验证头，但继续处理');
-    return next();
+  const expected = config.feishu.verificationToken;
+  const token = req.body?.header?.token ?? req.body?.token;
+  if (!expected) return res.status(503).json({ error: 'Verification token is not configured' });
+  if (req.body?.encrypt) return res.status(400).json({ error: 'Encrypted events are not configured' });
+  const actual = Buffer.from(typeof token === 'string' ? token : '');
+  const target = Buffer.from(expected);
+  if (actual.length !== target.length || !crypto.timingSafeEqual(actual, target)) {
+    return res.status(401).json({ error: 'Invalid verification token' });
   }
-
-  // 使用 App Secret 计算签名
-  const signContent = timestamp + '\n' + config.feishu.appSecret;
-  const computedSignature = crypto
-    .createHmac('sha256', config.feishu.appSecret)
-    .update(signContent)
-    .digest('base64');
-
-  console.log('签名验证：', {
-    expected: computedSignature,
-    actual: signature,
-    match: signature === computedSignature
-  });
-
-  if (signature !== computedSignature) {
-    console.warn('签名验证失败');
-    // 继续处理，让上层应用处理
-  }
-
   next();
 }

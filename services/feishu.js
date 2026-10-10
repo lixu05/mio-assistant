@@ -27,6 +27,7 @@ class FeishuService {
         }
       );
 
+      if (response.data.code !== 0 || !response.data.tenant_access_token) throw new Error(`Feishu token error: ${response.data.code} ${response.data.msg}`);
       this.accessToken = response.data.tenant_access_token;
       // token有效期通常为2小时，提前5分钟刷新
       this.tokenExpireTime = Date.now() + (response.data.expire - 300) * 1000;
@@ -38,13 +39,37 @@ class FeishuService {
     }
   }
 
+  async getBotOpenId() {
+    if (config.feishu.botOpenId) return config.feishu.botOpenId;
+    if (this.botOpenId) return this.botOpenId;
+    const token = await this.getTenantAccessToken();
+    const response = await axios.get(`${FEISHU_API_BASE}/bot/v3/info`, {
+      headers: { Authorization: `Bearer ${token}` }, timeout: 20000
+    });
+    if (response.data.code !== 0 || !response.data.bot?.open_id) throw new Error('Cannot identify Feishu bot');
+    this.botOpenId = response.data.bot.open_id;
+    return this.botOpenId;
+  }
+
+  async replyMessage(messageId, content) {
+    const token = await this.getTenantAccessToken();
+    const response = await axios.post(
+      `${FEISHU_API_BASE}/im/v1/messages/${encodeURIComponent(messageId)}/reply`,
+      { msg_type: 'text', content: JSON.stringify({ text: content }) },
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 20000 }
+    );
+    if (response.data.code !== 0) throw new Error(`Feishu reply error: ${response.data.code} ${response.data.msg}`);
+    console.log('Feishu reply delivered');
+    return response.data;
+  }
+
   // 发送消息
   async sendMessage(receiveId, content, msgType = 'text') {
     const token = await this.getTenantAccessToken();
 
     try {
       const response = await axios.post(
-        `${FEISHU_API_BASE}/im/v1/messages?receive_id_type=user_id`,
+        `${FEISHU_API_BASE}/im/v1/messages?receive_id_type=open_id`,
         {
           receive_id: receiveId,
           msg_type: msgType,

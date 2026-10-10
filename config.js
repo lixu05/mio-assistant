@@ -5,11 +5,14 @@ dotenv.config();
 export const config = {
   feishu: {
     appId: process.env.FEISHU_APP_ID,
+    botOpenId: process.env.FEISHU_BOT_OPEN_ID,
     appSecret: process.env.FEISHU_APP_SECRET,
     verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
   },
   claude: {
     apiKey: process.env.CLAUDE_API_KEY,
+    baseURL: process.env.CLAUDE_BASE_URL,
+    model: process.env.CLAUDE_MODEL || 'claude-opus-5',
   },
   server: {
     port: process.env.PORT || 3000,
