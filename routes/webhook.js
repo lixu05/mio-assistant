@@ -9,16 +9,18 @@ const router = express.Router();
 router.post('/message', async (req, res) => {
   const { token, challenge, ts, type, event } = req.body;
 
-  // 验证飞书请求
-  if (token !== config.feishu.verificationToken) {
-    console.warn('Token验证失败');
-    return res.status(401).json({ error: '未授权' });
+  console.log('收到飞书请求:', { type, token });
+
+  // 处理飞书的challenge请求（初始验证）- 优先处理，不验证token
+  if (type === 'url_verification') {
+    console.log('处理飞书URL验证，返回challenge');
+    return res.json({ challenge });
   }
 
-  // 处理飞书的challenge请求（初始验证）
-  if (type === 'url_verification') {
-    console.log('处理飞书URL验证');
-    return res.json({ challenge });
+  // 验证飞书请求token
+  if (token !== config.feishu.verificationToken) {
+    console.warn('Token验证失败，期望:', config.feishu.verificationToken, '实际:', token);
+    return res.status(401).json({ error: '未授权' });
   }
 
   // 处理事件
