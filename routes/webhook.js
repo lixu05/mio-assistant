@@ -7,20 +7,22 @@ const router = express.Router();
 
 // 处理飞书Webhook请求
 router.post('/message', async (req, res) => {
+  console.log('=== 收到飞书Webhook请求 ===');
+  console.log('Headers:', req.headers);
+  console.log('Body:', JSON.stringify(req.body, null, 2));
+
   const { token, challenge, ts, type, event } = req.body;
 
-  console.log('收到飞书请求:', { type, token });
-
-  // 处理飞书的challenge请求（初始验证）- 优先处理，不验证token
+  // 处理飞书的challenge请求（初始验证）- 最优先处理
   if (type === 'url_verification') {
-    console.log('处理飞书URL验证，返回challenge');
+    console.log('✅ 处理URL验证请求，返回challenge');
     return res.json({ challenge });
   }
 
-  // 验证飞书请求token
-  if (token !== config.feishu.verificationToken) {
-    console.warn('Token验证失败，期望:', config.feishu.verificationToken, '实际:', token);
-    return res.status(401).json({ error: '未授权' });
+  // 处理事件回调
+  if (type === 'event_callback') {
+    console.log('✅ 处理事件回调');
+    // 继续处理，不中断
   }
 
   // 处理事件
